@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "./version"
+require_relative "./request/query"
+require_relative "./response/content"
 require 'http'
 require 'json'
 
@@ -8,6 +10,7 @@ require 'json'
 module Elegant
   class API
     URL = "https://api.elegantcms.io/api/v1/contents"
+    attr_reader :client
 
     def initialize(api_key:, cache_time: 15, version: 'v1', url: URL)
       @api_key = api_key
@@ -15,7 +18,7 @@ module Elegant
       @version = version
       @headers = {
         "Accept"        => "application/json",
-        "Authorization" => "Bearer '#@api_key'",
+        "Authorization" => "Token token=#@api_key",
         "User-agent"    => "elegant/#{Elegant::VERSION};ruby"
       }
       @client = Client.new(@url, @headers)
@@ -30,83 +33,58 @@ module Elegant
     end
 
     def find(id)
-      fail ArgumentError, "ID must be a UUID String" unless id.is_a?(String)
-      where(id: id)
+      send Request::Query.new.find(id)
     end
 
     def content_type(type,
-                     sort_by:        :created_at,
+                     sort_by:        :updated_at,
                      publish_status: :published,
                      status:         :live,
                      page:           1,
                      size:           25)
-      fail ArgumentError, "Type must be a String" unless type.is_a?(String)
-      fail ArgumentError, "PublishStatus must be one of (:published, :expired)" unless [:published, :expired].include?(publish_status)
-      where(
-        type: type,
+      request = Request::Query.new.content_type(
+        type,
         sort_by: sort_by,
-        publish: publish_status,
+        publish_status: publish_status,
         status: status,
         page: page,
         size: size)
+
+      send request
     end
 
     def published
-      publish_status(:published)
+      send Request::Query.new.published(:published)
     end
 
     def expired
-      publish_status(:expired)
+      send Request::Query.new.expired(:expired)
     end
 
     def live
-      draft_status(:live)
+      send Request::Query.new.live(:live)
     end
 
     def draft
-      draft_status(:draft)
+      send Request::Query.new.draft(:draft)
     end
 
     def all
-      where
+      send Request::Query.new.all
+    end
+
+    def send(request = @request)
+      res = get(request)
+      res.map { |x| Response::Content.new(x) }
     end
 
     private
-    attr_reader :url
-
-    def publish_status(p_status)
-      where(publish: p_status)
-    end
-
-    def draft_status(d_status)
-      where(status: d_status)
-    end
-
-    def where(**qs)
-      [].tap do |params|
-        add_param(params, "filter[uuid]",           :id,      qs)
-        add_param(params, "filter[type]",           :type,    qs)
-        add_param(params, "filter[status]",         :status,  qs)
-        add_param(params, "filter[publish_status]", :publish, qs)
-        add_param(params, "page[number]",           :page,    qs)
-        add_param(params, "page[size]",             :size,    qs)
-        add_param(params, "sort",                   :sort_by, qs)
-      end.join("&")
-    end
+    attr_reader :url, :headers
 
     def get(request)
-      JSON.parse(Http.headers(headers).get(url + '/?' + request))["data"]
+      res = Http.headers(headers).get(url + '/?' + request)
+      JSON.parse(res)["data"]
     end
 
-    def add_param(bucket, query, name, supplied_params)
-      bucket << "#{query}=#{supplied_params.fetch(name)}" if supplied_params[name]
-    end
-    #Equivalent to passing no parameters
-    # https://apps.elegantcms.io/api/v1/contents?
-    # filter[publish_status]=published&
-    # filter[status]=live&
-    # page[number]=1&
-    # page[size]=25&
-    # sort=-updated_at
   end
 end

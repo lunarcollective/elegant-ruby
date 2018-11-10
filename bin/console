@@ -2,13 +2,11 @@
 
 require "bundler/setup"
 require "elegant/client"
-
-# You can add fixtures and/or initialization code here to make experimenting
-# with your gem easier. You can also use a different console, if you like.
-
-# (If you use this, don't forget to add pry to your Gemfile!)
-# require "pry"
-# Pry.start
-
 require "pry"
-Pry.start(__FILE__)
+
+
+token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhcHBfdXVpZCI6IjIzNDk5YzdhLTEwYjktNGYwNS1iOTBkLTExNmE5MDk4ZDkyZCIsImlkIjo0NzgsInVwZGF0ZWRfYXQiOiIyMDE4LTA4LTMwIDEzOjQ3OjE2IFVUQyJ9.PaGLr4XHABgBUPjcMxys1QPQnG-iLOP1lO4AexJ9hys"
+@api= Elegant::API.new(api_key: token, cache_time: 0)
+@client = @api.client
+
+binding.pry
